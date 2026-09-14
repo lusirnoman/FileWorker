@@ -10,6 +10,25 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const { params, env } = context;
     const { filename } = params;
     const { BUCKET } = env;
+    if (env.BUCKET_BINDING) {
+        const object = await env.BUCKET_BINDING.get(filename as string);
+        if (!object) return new Response("Not found", { status: 404 });
+        const metadata = object.customMetadata ?? {};
+        if (metadata['x-store-visibility'] !== 'public' && !await auth(env, context.request)) {
+            await object.body.cancel();
+            return new Response("Not found", { status: 404 });
+        }
+        const headers = new Headers(metadata);
+        object.writeHttpMetadata(headers);
+        headers.set('content-type', metadata['x-store-type'] === 'text'
+            ? 'text/plain;charset=utf-8'
+            : object.httpMetadata?.contentType || mime.getType(filename as string) || 'application/octet-stream');
+        headers.set('content-length', String(object.size));
+        headers.set('last-modified', object.uploaded.toUTCString());
+        headers.set('etag', object.httpEtag);
+        headers.set('cache-control', 'private, no-store');
+        return new Response(object.body, { headers });
+    }
     const s3 = createS3Client(env);
     const command = new GetObjectCommand({
         Bucket: BUCKET!,
@@ -38,7 +57,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
     headers.set('etag', response.ETag);
 
-    if (headers.get("x-store-visibility") !== "public" && !auth(env, context.request)) {
+    if (headers.get("x-store-visibility") !== "public" && !await auth(env, context.request)) {
         return new Response("Not found", { status: 404 });
     }
     return new Response(
@@ -51,12 +70,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
 export const onRequestPut: PagesFunction<Env> = async (context) => {
     const { params, env, request } = context;
-    if (!auth(env, request)) {
+    if (!await auth(env, request)) {
         return new Response("Unauthorized", { status: 401 });
     }
     const { filename } = params;
     const { BUCKET } = env;
-    const s3 = createS3Client(env);
     const headers = new Headers(request.headers);
     const x_store_headers = [];
     for (const [key, value] of headers.entries()) {
@@ -64,6 +82,14 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
             x_store_headers.push([key, value]);
         }
     }
+    if (env.BUCKET_BINDING) {
+        await env.BUCKET_BINDING.put(filename as string, request.body, {
+            customMetadata: Object.fromEntries(x_store_headers),
+            httpMetadata: { contentType: request.headers.get('content-type') || 'application/octet-stream' },
+        });
+        return new Response("OK");
+    }
+    const s3 = createS3Client(env);
     const parallelUploads3 = new Upload({
         client: s3,
         params: { Bucket: BUCKET, Key: filename as string, Body: request.body, Metadata: Object.fromEntries(x_store_headers) },
@@ -77,12 +103,11 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
 
 export const onRequestPatch: PagesFunction<Env> = async (context) => {
     const { params, env, request } = context;
-    if (!auth(env, request)) {
+    if (!await auth(env, request)) {
         return new Response("Unauthorized", { status: 401 });
     }
     const { filename } = params;
     const { BUCKET } = env;
-    const s3 = createS3Client(env);
     const headers = new Headers(request.headers);
     const x_store_headers = [];
     for (const [key, value] of headers.entries()) {
@@ -90,6 +115,19 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
             x_store_headers.push([key, value]);
         }
     }
+    if (env.BUCKET_BINDING) {
+        const object = await env.BUCKET_BINDING.get(filename as string);
+        if (!object) return new Response("Not found", { status: 404 });
+        await env.BUCKET_BINDING.put(filename as string, object.body, {
+            customMetadata: { ...object.customMetadata, ...Object.fromEntries(x_store_headers) },
+            httpMetadata: object.httpMetadata,
+            onlyIf: { etagMatches: object.etag },
+        }).then(result => {
+            if (!result) throw new Error("File changed while updating metadata");
+        });
+        return new Response("OK");
+    }
+    const s3 = createS3Client(env);
     const command = new CopyObjectCommand({
         Bucket: BUCKET!,
         CopySource: `${BUCKET}/${filename}`,
@@ -103,11 +141,15 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
 
 export const onRequestDelete: PagesFunction<Env> = async (context) => {
     const { params, env, request } = context;
-    if (!auth(env, request)) {
+    if (!await auth(env, request)) {
         return new Response("Unauthorized", { status: 401 });
     }
     const { filename } = params;
     const { BUCKET } = env;
+    if (env.BUCKET_BINDING) {
+        await env.BUCKET_BINDING.delete(filename as string);
+        return new Response("OK");
+    }
     const s3 = createS3Client(env);
     const command = new DeleteObjectCommand({
         Bucket: BUCKET!,
