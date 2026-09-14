@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fileworker",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-03-14",
+  "vars": { "REGION": "auto" },
+  "r2_buckets": [
+    { "binding": "BUCKET_BINDING", "bucket_name": "fileworker-store" }
+  ]
+}

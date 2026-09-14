@@ -4,6 +4,31 @@ FileWorker 是一个轻量级的文件管理和在线剪贴板，基于 Cloudfla
 
 ## ✏️部署
 
+### 当前 Cloudflare Pages 部署
+
+本仓库的 `wrangler.jsonc` 对应 `fileworker` Pages 项目，使用
+`BUCKET_BINDING` 直接连接现有的 `fileworker-store` R2 存储桶。
+此配置无需 S3 Access Key；`PASSWORD` 继续使用 Pages 生产环境中保存的 Secret，
+不要将密码写入代码或配置文件。其他 S3 部署仍可使用下方的环境变量配置。
+
+```sh
+npm ci
+npm run build
+npm run deploy -- --project-name fileworker
+```
+
+本地测试：在不提交的 `.dev.vars` 中设置 `PASSWORD=本地测试密码`，运行
+`npm run preview -- --port 8794`。本地 R2 使用模拟存储，不修改生产文件。
+运行 `npm run test:smoke` 可验证上传、下载、列表分页、访问控制、元数据更新和删除；
+测试默认访问 `http://127.0.0.1:8794`，可通过 `FILEWORKER_URL` 修改地址。
+通过 `FILEWORKER_PASSWORD` 或 `FILEWORKER_PASSWORD_FILE` 提供测试密码。
+测试只创建并删除随机 `codex-smoke-` 前缀的测试文件。
+
+当前 Pages 项目使用 Direct Upload。重新部署使用上述命令；修改 GitHub 仓库
+不会自动发布，除非另外配置 CI。
+
+### 原版 Git / S3 部署方式
+
 更新无需重新部署，在 fork 的仓库里同步上游即可，cloudflare 会自动更新。
 
 1. Fork 本仓库

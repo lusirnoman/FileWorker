@@ -61,7 +61,7 @@ const isEqual = (a: string, b: string) => {
     return crypto.subtle.timingSafeEqual(encodedA, encodedB);
 }
 
-const auth = (env: Env, request: Request) => {
+const auth = async (env: Env, request: Request) => {
     const { PASSWORD } = env;
     // cookie PASSWORD
     const cookie = parse(request.headers.get('Cookie') ?? '');
@@ -74,7 +74,9 @@ const auth = (env: Env, request: Request) => {
     const path_without_sign = path.replace(/&sign=[^&]+/, '');
     const sign = url.searchParams.get('sign');
     if (sign === null) return false;
-    if (!hmacVerify(path_without_sign, PASSWORD, sign)) {
+    try {
+        if (!await hmacVerify(path_without_sign, PASSWORD ?? '', sign)) return false;
+    } catch {
         return false;
     }
     const expire = url.searchParams.get('expire');

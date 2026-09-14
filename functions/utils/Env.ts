@@ -1,4 +1,4 @@
-interface Env {
+interface Env extends Partial<Pick<FileWorkerBindings, "BUCKET_BINDING">> {
     REGION?: string,
     ENDPOINT: string,
     BUCKET: string,

@@ -12,6 +12,7 @@ const initInterceptors = () => {
             if (error.response?.status === 401) {
                 await router.push('/login');
             }
+            throw error;
         });
 }
 
