@@ -4,6 +4,10 @@ export default {
         public: 'Public',
         private: 'Private',
         save: 'Save',
+        qr: 'QR code',
+        close: 'Close',
+        qr_error: 'Could not generate a QR code for this URL.',
+        qr_private: 'Private files still require authentication; this QR code does not grant access.',
     },
     index: {
         file_channel_title: 'Files',

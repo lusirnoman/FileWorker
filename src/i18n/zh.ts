@@ -4,6 +4,10 @@ export default {
         public: '公开',
         private: '私有',
         save: '保存',
+        qr: '二维码',
+        close: '关闭',
+        qr_error: '无法为此链接生成二维码。',
+        qr_private: '私有文件仍需要身份验证；二维码不会授予访问权限。',
     },
     index: {
         file_channel_title: '文件',
